@@ -60,7 +60,7 @@ public class ProductRepositoryImpl implements ProductRepository {
             case LATEST -> Sort.by(Sort.Direction.DESC, "createdAt");
             case PRICE_ASC -> Sort.by(Sort.Direction.ASC, "price.amount");  // @Embedded Money 타입의 중첩 경로
             case LIKES_DESC -> Sort.by(Sort.Direction.DESC, "likeCount");
-            case BRAND -> Sort.by(Sort.Direction.DESC, "brand");
+            case BRAND -> Sort.by(Sort.Direction.DESC, "brand.brandName");
             case NAME -> Sort.by(Sort.Direction.ASC, "productName");
         };
     }

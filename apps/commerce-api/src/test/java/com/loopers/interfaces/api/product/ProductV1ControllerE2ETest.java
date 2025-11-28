@@ -7,14 +7,12 @@ import com.loopers.infrastructure.brand.BrandJpaRepository;
 import com.loopers.infrastructure.product.ProductJpaRepository;
 import com.loopers.interfaces.api.ApiResponse;
 import com.loopers.utils.DatabaseCleanUp;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -41,6 +39,24 @@ class ProductV1ControllerE2ETest {
 
     @Autowired
     private DatabaseCleanUp databaseCleanUp;
+
+    @Autowired(required = false)
+    private RedisTemplate<String, Object> productCacheTemplate;
+
+    @BeforeEach
+    void setUp() {
+        // Redis 캐시 초기화 (테스트 격리를 위해 각 테스트 시작 전 실행)
+        if (productCacheTemplate != null) {
+            try {
+                var keys = productCacheTemplate.keys("product:detail:*");
+                if (keys != null && !keys.isEmpty()) {
+                    productCacheTemplate.delete(keys);
+                }
+            } catch (Exception e) {
+                // Redis가 없는 환경에서는 무시
+            }
+        }
+    }
 
     @AfterEach
     void tearDown() {

@@ -92,8 +92,10 @@ class OrderV1ControllerE2ETest {
             user.chargePoint(Money.of(100000)); // 10만원 충전
             User savedUser = userJpaRepository.save(user);
 
+            LocalDate today = LocalDate.now();
+
             Coupon coupon = Coupon.createCoupon("COUPON123456", "테스트쿠폰", "테스트 쿠폰입니다",
-                    LocalDate.of(2025, 11, 20), LocalDate.of(2025, 11, 30), DiscountType.RATE, 10);
+                    today.minusDays(1), today.plusDays(30), DiscountType.RATE, 10);
             Coupon savedCoupon = couponJpaRepository.save(coupon);
 
             IssuedCoupon issuedCoupon = IssuedCoupon.issue(savedUser, savedCoupon);
@@ -189,8 +191,10 @@ class OrderV1ControllerE2ETest {
             user.chargePoint(Money.of(100000)); // 10만원 충전
             User savedUser = userJpaRepository.save(user);
 
+            LocalDate today = LocalDate.now();
+
             Coupon coupon = Coupon.createCoupon("COUPON123456", "테스트쿠폰", "테스트 쿠폰입니다",
-                    LocalDate.of(2025, 11, 20), LocalDate.of(2025, 11, 30), DiscountType.RATE, 10);
+                    today.minusDays(1), today.plusDays(30), DiscountType.RATE, 10);
             Coupon savedCoupon = couponJpaRepository.save(coupon);
 
             IssuedCoupon issuedCoupon = IssuedCoupon.issue(savedUser, savedCoupon);
@@ -322,8 +326,10 @@ class OrderV1ControllerE2ETest {
             user.chargePoint(Money.of(1000000)); // 충분한 포인트
             User savedUser = userJpaRepository.save(user);
 
+            LocalDate today = LocalDate.now();
+
             Coupon coupon = Coupon.createCoupon("COUPON123456", "테스트쿠폰", "테스트 쿠폰입니다",
-                    LocalDate.of(2025, 11, 20), LocalDate.of(2025, 11, 30), DiscountType.RATE, 10);
+                    today.minusDays(1), today.plusDays(30), DiscountType.RATE, 10);
             Coupon savedCoupon = couponJpaRepository.save(coupon);
 
             IssuedCoupon issuedCoupon = IssuedCoupon.issue(savedUser, savedCoupon);
@@ -367,8 +373,10 @@ class OrderV1ControllerE2ETest {
             user.chargePoint(Money.of(5000)); // 부족한 포인트
             User savedUser = userJpaRepository.save(user);
 
+            LocalDate today = LocalDate.now();
+
             Coupon coupon = Coupon.createCoupon("COUPON123456", "테스트쿠폰", "테스트 쿠폰입니다",
-                    LocalDate.of(2025, 11, 20), LocalDate.of(2025, 11, 30), DiscountType.RATE, 10);
+                    today.minusDays(1), today.plusDays(30), DiscountType.RATE, 10);
             Coupon savedCoupon = couponJpaRepository.save(coupon);
 
             IssuedCoupon issuedCoupon = IssuedCoupon.issue(savedUser, savedCoupon);

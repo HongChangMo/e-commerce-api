@@ -40,18 +40,4 @@ public class ProductSpecification {
         };
     }
 
-    /**
-     * Brand를 즉시 로딩 (LazyInitializationException 방지)
-     * 페이징과 함께 사용할 때는 DISTINCT를 적용하지 않음
-     */
-    public static Specification<Product> fetchBrand() {
-        return (root, query, criteriaBuilder) -> {
-            if (query != null) {
-                root.fetch("brand", JoinType.LEFT);
-                // 페이징 사용 시 query.distinct(true)는 COUNT 쿼리에서 문제를 일으킴
-                // 대신 JPA는 자동으로 결과 중복을 제거함
-            }
-            return null;
-        };
-    }
 }

@@ -27,7 +27,8 @@ import java.util.List;
 @Table(
         name = "products",
         indexes = {
-                @Index(name = "idx_product_like_count", columnList = "like_count")
+                @Index(name = "idx_product_like_count", columnList = "like_count"),
+                @Index(name = "idx_brand_like_count", columnList = "brand_id, like_count")
         }
 )
 @Getter

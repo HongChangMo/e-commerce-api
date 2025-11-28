@@ -48,25 +48,25 @@ public class ProductFacade {
                 log.debug("Cache HIT for productId: {}", productId);
                 return cachedProduct;
             }
+        } catch (Exception e) {
+            log.warn("Redis read error for productId: {}. Proceeding to DB.", productId, e);
+        }
 
-            log.debug("Cache MISS for productId: {}", productId);
+        log.debug("Cache MISS for productId: {}", productId);
 
-            // 2. 캐시 미스: DB 조회 (트랜잭션 컨텍스트 내에서 실행)
-            Product product = productService.getProductDetail(productId);
-            ProductDetailInfo productDetail = ProductDetailInfo.from(product);
+        // 2. 캐시 미스: DB 조회 (트랜잭션 컨텍스트 내에서 실행)
+        Product product = productService.getProductDetail(productId);
+        ProductDetailInfo productDetail = ProductDetailInfo.from(product);
 
-            // 3. 캐시 저장 (TTL 적용)
+        // 3. 캐시 저장 (TTL 적용)
+        try {
             productCacheTemplate.opsForValue().set(cacheKey, productDetail, CACHE_TTL);
             log.debug("Cached productId: {} with TTL: {}", productId, CACHE_TTL);
-
-            return productDetail;
-
-        } catch (Exception e) {
-            // Redis 장애 시 DB 조회로 폴백
-            log.error("Redis error for productId: {}. Falling back to DB.", productId, e);
-            Product product = productService.getProductDetail(productId);
-            return ProductDetailInfo.from(product);
+        }  catch (Exception e) {
+            log.warn("Redis write error for productId: {}", productId, e);
         }
+
+        return productDetail;
     }
 
     /**
