@@ -71,10 +71,12 @@ public class PaymentFacade {
 
         // Order 취소 처리 (도메인 로직)
         Order order = payment.getOrder();
-        order.cancelOrder();
 
-        // 보상 트랜잭션: 주문 생성 시 차감된 자원들을 복구
+        // 보상 트랜잭션: 주문 상태 변경 전에 먼저 실행
         executeCompensationTransaction(order);
+
+        // 보상 트랜잭션 완료 후 Order 상태 변경
+        order.cancelOrder();
 
         log.info("결제 실패 처리 완료 - PaymentId: {}, OrderId: {}",
                 payment.getPaymentId(), order.getId());
