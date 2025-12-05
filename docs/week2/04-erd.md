@@ -58,7 +58,7 @@ erDiagram
         text description "쿠폰 설명"
         date valid_start_date "유효 시작일"
         date valid_end_date "유효 종료일"
-        varchar discount_type "할인 타입 (PERCENTAGE/FIXED_AMOUNT)"
+        varchar discount_type "할인 타입 (RATE/AMOUNT)"
         int discount_value "할인 값 (비율 또는 금액)"
         boolean is_active "활성화 여부"
         int max_issuance_limit "최대 발행 수량 (null이면 무제한)"
