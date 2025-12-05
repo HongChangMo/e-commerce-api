@@ -5,6 +5,8 @@ import com.loopers.infrastructure.external.dto.PaymentExternalDto;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 /**
  * PG 결제 시스템 FeignClient
  * X-USER-ID 헤더는 FeignClientConfig의 pgClientIdInterceptor에서 자동으로 추가됨
@@ -32,9 +34,9 @@ public interface PaymentClient {
     /**
      * 주문에 엮인 결제 정보 조회
      * */
-    @GetMapping("/api/v1/payments?orderId={orderId}")
-    PaymentExternalDto.PaymentResponse[] paymentList(
-            @PathVariable String orderId
+    @GetMapping("/api/v1/payments")
+    List<PaymentExternalDto.PaymentResponse> paymentList(
+            @RequestParam("orderId") String orderId
     );
 
 }
