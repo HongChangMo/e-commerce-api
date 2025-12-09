@@ -62,7 +62,7 @@ public class OrderFacade {
             paymentProcessor.processPointPayment(user, savedOrder);
         } else if (command.paymentType() == PaymentType.CARD) {
             // 카드 결제는 별도 트랜잭션으로 분리 (PG 장애 시 Payment만 저장)
-            paymentProcessor.processCardPayment(command, savedOrder.getId());
+            paymentProcessor.processCardPayment(command, savedOrder);
         }
 
         // 8. 쿠폰 사용 처리
