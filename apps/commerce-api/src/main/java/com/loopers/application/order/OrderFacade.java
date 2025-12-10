@@ -7,6 +7,8 @@ import com.loopers.domain.issuedcoupon.IssuedCouponService;
 import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderService;
 import com.loopers.domain.payment.PaymentType;
+import com.loopers.domain.payment.event.CardPaymentRequestedEvent;
+import com.loopers.domain.payment.event.PointPaymentRequestedEvent;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.user.User;
@@ -14,6 +16,7 @@ import com.loopers.domain.user.UserService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,7 +32,8 @@ public class OrderFacade {
     private final ProductService productService;
     private final CouponService couponService;
     private final IssuedCouponService issuedCouponService;
-    private final PaymentProcessor paymentProcessor;
+
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public OrderInfo createOrder(OrderCommand command) {
@@ -56,13 +60,23 @@ public class OrderFacade {
         // 6. 주문 저장 (Payment가 Order를 참조하기 전에 먼저 저장)
         Order savedOrder = orderService.registerOrder(order);
 
-        // 7. 결제 방식별 처리
+        // 7. 결제 방식별 처리(이벤트 발행)
         if (command.paymentType() == PaymentType.POINT) {
-            // 포인트 결제는 동기 처리 (트랜잭션 분리 불필요)
-            paymentProcessor.processPointPayment(user, savedOrder);
+            eventPublisher.publishEvent(
+                    new PointPaymentRequestedEvent(
+                            savedOrder.getId(),
+                            user.getId()
+                    )
+            );
         } else if (command.paymentType() == PaymentType.CARD) {
-            // 카드 결제는 별도 트랜잭션으로 분리 (PG 장애 시 Payment만 저장)
-            paymentProcessor.processCardPayment(command, savedOrder);
+            eventPublisher.publishEvent(
+                    new CardPaymentRequestedEvent(
+                            savedOrder.getId(),
+                            user.getId(),
+                            command.cardType(),
+                            command.cardNo()
+                    )
+            );
         }
 
         // 8. 쿠폰 사용 처리
