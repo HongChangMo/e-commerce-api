@@ -13,4 +13,6 @@ public interface ProductLikeRepository {
     void delete(ProductLike productLike);
 
     boolean existsByLikeUserAndLikeProduct(User user, Product product);
+
+    Optional<ProductLike> findById(Long likeId);
 }

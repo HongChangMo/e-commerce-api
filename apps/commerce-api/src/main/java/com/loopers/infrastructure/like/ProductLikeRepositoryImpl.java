@@ -34,4 +34,9 @@ public class ProductLikeRepositoryImpl implements ProductLikeRepository {
     public boolean existsByLikeUserAndLikeProduct(User user, Product product) {
         return productLikeJpaRepository.existsByLikeUserAndLikeProduct(user, product);
     }
+
+    @Override
+    public Optional<ProductLike> findById(Long likeId) {
+        return productLikeJpaRepository.findById(likeId);
+    }
 }
