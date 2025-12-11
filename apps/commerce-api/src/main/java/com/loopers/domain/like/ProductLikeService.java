@@ -38,9 +38,10 @@ public class ProductLikeService {
         ProductLike like = productLikeRepository.findByLikeUserAndLikeProduct(user, product)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "좋아요가 존재하지 않습니다"));
 
-        // Product의 좋아요 수 감소
-        product.decrementLikeCount(like);
+        // ProductLike hard delete 처리
+        productLikeRepository.delete(like);
 
+        // Product의 좋아요 수(집계) 감소 이벤트 분리
         eventPublisher.publishEvent(
                 new ProductLikeRemovedEvent(
                         like.getId(), product.getId()
