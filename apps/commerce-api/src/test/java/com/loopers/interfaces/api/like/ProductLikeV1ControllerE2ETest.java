@@ -23,6 +23,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -32,6 +33,7 @@ import java.util.concurrent.Executors;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class ProductLikeV1ControllerE2ETest {
@@ -178,8 +180,13 @@ class ProductLikeV1ControllerE2ETest {
             executorService.shutdown();
 
             // then - 좋아요 개수가 정확히 10개 증가했는지 확인
-            Product finalProduct = productJpaRepository.findById(savedProduct.getId()).orElseThrow();
-            assertThat(finalProduct.getLikeCount()).isEqualTo(numberOfUsers);
+            await().atMost(Duration.ofSeconds(5))
+                    .pollInterval(Duration.ofMillis(300))
+                    .untilAsserted(() -> {
+                        Product finalProduct = productJpaRepository.findById(savedProduct.getId()).orElseThrow();
+                        assertThat(finalProduct.getLikeCount()).isEqualTo(numberOfUsers);
+                    });
+
         }
     }
 }
