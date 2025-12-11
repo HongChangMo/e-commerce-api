@@ -1,5 +1,6 @@
 package com.loopers.domain.like;
 
+import com.loopers.domain.activity.event.UserActivityEvent;
 import com.loopers.domain.like.event.ProductLikeAddedEvent;
 import com.loopers.domain.like.event.ProductLikeRemovedEvent;
 import com.loopers.domain.product.Product;
@@ -30,6 +31,16 @@ public class ProductLikeService {
                             new ProductLikeAddedEvent(savedLike.getId(), product.getId())
                     );
 
+                    // 사용자 행동 추적 이벤트 발행
+                    eventPublisher.publishEvent(
+                            UserActivityEvent.of(
+                                    user.getUserId(),
+                                    "PRODUCT_LIKE_ADDED",
+                                    "PRODUCT",
+                                    product.getId()
+                            )
+                    );
+
                     return savedLike;
                 });
     }
@@ -48,6 +59,15 @@ public class ProductLikeService {
                 )
         );
 
+        // 사용자 행동 추적 이벤트 발행
+        eventPublisher.publishEvent(
+                UserActivityEvent.of(
+                        user.getUserId(),
+                        "PRODUCT_LIKE_CANCELLED",
+                        "PRODUCT",
+                        product.getId()
+                )
+        );
     }
 
     public ProductLike getProductLikeById(Long likeId) {

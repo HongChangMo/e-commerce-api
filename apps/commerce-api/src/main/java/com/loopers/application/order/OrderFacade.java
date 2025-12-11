@@ -1,5 +1,6 @@
 package com.loopers.application.order;
 
+import com.loopers.domain.activity.event.UserActivityEvent;
 import com.loopers.domain.coupon.Coupon;
 import com.loopers.domain.coupon.CouponService;
 import com.loopers.domain.issuedcoupon.IssuedCoupon;
@@ -78,6 +79,16 @@ public class OrderFacade {
                     )
             );
         }
+
+        // 사용자 행동 추적 이벤트 발행
+        eventPublisher.publishEvent(
+                UserActivityEvent.of(
+                        user.getUserId(),
+                        "ORDER_CREATED",
+                        "ORDER",
+                        order.getId()
+                )
+        );
 
         // 8. 쿠폰 사용 처리
         if (issuedCoupon != null) {

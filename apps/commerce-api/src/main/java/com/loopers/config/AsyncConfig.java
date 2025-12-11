@@ -3,6 +3,7 @@ package com.loopers.config;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.Executor;
@@ -11,13 +12,14 @@ import java.util.concurrent.ThreadPoolExecutor;
 /**
  * 비동기 처리를 위한 스레드 풀 설정
  *
- * 결제 이벤트 처리(@Async)를 위한 전용 스레드 풀 구성:
+ * 결제 이벤트 처리, 사용자 행동 로깅 등 @Async를 위한 전용 스레드 풀 구성:
  * - 코어 스레드: 5개 (기본 유지)
  * - 최대 스레드: 10개 (부하 시 확장)
  * - 큐 용량: 100개 (대기 가능한 작업 수)
  * - 거부 정책: CallerRunsPolicy (큐 초과 시 호출 스레드에서 실행)
  */
 @Slf4j
+@EnableAsync
 @Configuration
 public class AsyncConfig {
 
