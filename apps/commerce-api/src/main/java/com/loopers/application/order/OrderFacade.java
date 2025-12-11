@@ -3,6 +3,7 @@ package com.loopers.application.order;
 import com.loopers.domain.activity.event.UserActivityEvent;
 import com.loopers.domain.coupon.Coupon;
 import com.loopers.domain.coupon.CouponService;
+import com.loopers.domain.coupon.event.CouponUsedEvent;
 import com.loopers.domain.issuedcoupon.IssuedCoupon;
 import com.loopers.domain.issuedcoupon.IssuedCouponService;
 import com.loopers.domain.order.Order;
@@ -45,8 +46,13 @@ public class OrderFacade {
         Coupon coupon = null;
         IssuedCoupon issuedCoupon = null;
         if (command.couponId() != null) {
+            // 1. 쿠폰 유효성 검증 (실패 시 예외)
             coupon = couponService.getValidCoupon(command.couponId());
-            issuedCoupon = issuedCouponService.getIssuedCouponByUser(user.getId(), command.couponId());
+            issuedCoupon = issuedCouponService
+                    .getIssuedCouponByUser(user.getId(), command.couponId());
+
+            // 2. 사전 검증을 통해 쿠폰 사용 가능 여부 검증
+            issuedCoupon.validateCanUseCoupon();
         }
 
         // 3. 상품 조회 (Pessimistic Lock)
@@ -80,6 +86,19 @@ public class OrderFacade {
             );
         }
 
+        // 8. 쿠폰 사용 처리
+        if (issuedCoupon != null) {
+            eventPublisher.publishEvent(
+                    new CouponUsedEvent(
+                            user.getId(),
+                            coupon.getId(),
+                            savedOrder.getId(),
+                            // 이미 쿠폰 할인이 적용된 금액
+                            order.getTotalPrice()
+                    )
+            );
+        }
+
         // 사용자 행동 추적 이벤트 발행
         eventPublisher.publishEvent(
                 UserActivityEvent.of(
@@ -89,11 +108,6 @@ public class OrderFacade {
                         order.getId()
                 )
         );
-
-        // 8. 쿠폰 사용 처리
-        if (issuedCoupon != null) {
-            issuedCoupon.useCoupon();
-        }
 
         return OrderInfo.from(savedOrder);
     }
