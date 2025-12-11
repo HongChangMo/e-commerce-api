@@ -1,6 +1,5 @@
 package com.loopers.application.like;
 
-import com.loopers.domain.like.ProductLike;
 import com.loopers.domain.like.ProductLikeService;
 import com.loopers.domain.like.event.ProductLikeAddedEvent;
 import com.loopers.domain.like.event.ProductLikeRemovedEvent;
@@ -33,11 +32,11 @@ public class ProductLikeEventListener {
     public void handleProductLikeAdded(ProductLikeAddedEvent event) {
         log.info("좋아요 추가 집계 처리 이벤트 시작 - ProductId: {}", event.getProductId());
 
-        Product product = productService.getProductById(event.getProductId());
-        ProductLike like = productLikeService.getProductLikeById(event.getLikeId());
+        // Pessimistic Lock으로 동시성 제어
+        Product product = productService.getProductWithLock(event.getProductId());
 
-        // 좋아요 처리
-        product.incrementLikeCount(like);
+        // 좋아요 수만 증가 (ProductLike는 별도 트랜잭션에서 이미 저장됨)
+        product.incrementLikeCount();
 
         log.info("좋아요 추가 집계 처리 이벤트 완료 - ProductId: {}, 현재 좋아요 수: {}",
                 event.getProductId(), product.getLikeCount());
@@ -53,10 +52,11 @@ public class ProductLikeEventListener {
     public void handleProductLikeRemoved(ProductLikeRemovedEvent event) {
         log.info("좋아요 취소 집계 처리 시작 - ProductId: {}", event.getProductId());
 
-        Product product = productService.getProductById(event.getProductId());
-        ProductLike like = productLikeService.getProductLikeById(event.getLikeId());
+        // Pessimistic Lock으로 동시성 제어
+        Product product = productService.getProductWithLock(event.getProductId());
 
-        product.decrementLikeCount(like);
+        // 좋아요 수만 감소 (ProductLike는 별도 트랜잭션에서 이미 삭제됨)
+        product.decrementLikeCount();
 
         log.info("좋아요 취소 집계 처리 이벤트 완료 - ProductId: {}, 현재 좋아요 수: {}",
                 event.getProductId(), product.getLikeCount());

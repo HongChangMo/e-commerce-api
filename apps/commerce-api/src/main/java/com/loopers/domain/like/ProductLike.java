@@ -30,6 +30,7 @@ import java.time.ZonedDateTime;
 public class ProductLike {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "like_product_id", nullable = false)
     private final Long id = 0L;
 
     @ManyToOne(fetch = FetchType.LAZY)

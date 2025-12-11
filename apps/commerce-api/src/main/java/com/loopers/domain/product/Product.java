@@ -114,13 +114,11 @@ public class Product extends BaseEntity {
         return this.stock.getQuantity();
     }
 
-    public void incrementLikeCount(ProductLike productLike) {
-        this.productLikes.add(productLike);
+    public void incrementLikeCount() {
         this.likeCount++;
     }
 
-    public void decrementLikeCount(ProductLike productLike) {
-        this.productLikes.remove(productLike);
+    public void decrementLikeCount() {
         if (this.likeCount > 0) {
             this.likeCount--;
         }

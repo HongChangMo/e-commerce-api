@@ -10,6 +10,7 @@ import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @RequiredArgsConstructor
 @Component
@@ -18,6 +19,7 @@ public class ProductLikeService {
     private final ProductLikeRepository productLikeRepository;
     private final ApplicationEventPublisher eventPublisher;
 
+    @Transactional
     public ProductLike addLike(User user, Product product) {
         // 멱등성 처리: 이미 좋아요가 존재하면 기존 것을 반환
         return productLikeRepository.findByLikeUserAndLikeProduct(user, product)
@@ -45,6 +47,7 @@ public class ProductLikeService {
                 });
     }
 
+    @Transactional
     public void cancelLike(User user, Product product) {
         ProductLike like = productLikeRepository.findByLikeUserAndLikeProduct(user, product)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "좋아요가 존재하지 않습니다"));
