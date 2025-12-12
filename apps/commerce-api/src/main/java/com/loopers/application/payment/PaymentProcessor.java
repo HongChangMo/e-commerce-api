@@ -5,6 +5,7 @@ import com.loopers.domain.order.OrderService;
 import com.loopers.domain.order.OrderStatus;
 import com.loopers.domain.order.event.OrderCompletedEvent;
 import com.loopers.domain.payment.*;
+import com.loopers.domain.payment.event.CardPaymentProcessingStartedEvent;
 import com.loopers.domain.user.User;
 import com.loopers.domain.user.UserService;
 import lombok.RequiredArgsConstructor;
@@ -99,12 +100,11 @@ public class PaymentProcessor {
      *
      * 처리 순서:
      * 1. Order 조회
-     * 2. 별도 트랜잭션에서 Payment 생성 및 저장 (TransactionTemplate 사용)
-     * 3. PG 결제 요청 (비동기)
+     * 2. PG 결제 요청 (이벤트 기반 비동기 처리)
      *    - PG 즉시 실패: Payment는 PENDING 유지
      *    - PG 성공: Payment → PROCESSING
      *    - PG 호출 실패: Payment는 PENDING 유지 (Scheduler 재시도 대상)
-     * 4. 주문 상태 업데이트
+     * 3. 주문 상태 업데이트
      *    - PROCESSING인 경우: OrderStatus.RECEIVED
      *    - PENDING인 경우: 상태 변경 없음 (나중에 처리)
      *
@@ -126,31 +126,22 @@ public class PaymentProcessor {
             );
             paymentService.save(p);
 
-            try {
-                // 3. PG 결제 요청 (비동기)
-                String callbackUrl = callbackBaseUrl + "/api/v1/payments/callback";
-                PaymentResult result = paymentGateway.processPayment(order.getUser().getUserId(), p, callbackUrl);
-
-                if ("FAIL".equals(result.status())) {
-                    log.warn("PG에서 즉시 실패 응답. orderId={}, paymentId={}",
-                            order.getId(), p.getPaymentId());
-                    return p;
-                }
-
-                p.startProcessing(result.transactionId());
-                log.info("PG 결제 요청 성공. orderId={}, paymentId={}, transactionId={}",
-                        order.getId(), p.getPaymentId(), result.transactionId());
-
-            } catch (Exception e) {
-                log.error("PG 호출 실패. Payment는 PENDING으로 유지. orderId={}, paymentId={}",
-                        order.getId(), p.getPaymentId(), e);
-            }
-
             return p;
         });
 
         // TransactionTemplate.execute()는 항상 non-null 반환
-        // 4. 주문 상태 업데이트
+        // 2. PG 처리 이벤트 발행
+        eventPublisher.publishEvent(
+                new CardPaymentProcessingStartedEvent(
+                        payment.getPaymentId(),
+                        order.getId(),
+                        order.getUser().getUserId(),
+                        cardType,
+                        cardNo
+                )
+        );
+
+        // 3. 주문 상태 업데이트
         if (payment.getStatus() == PaymentStatus.PROCESSING) {
             order.updateStatus(OrderStatus.RECEIVED);
         }
