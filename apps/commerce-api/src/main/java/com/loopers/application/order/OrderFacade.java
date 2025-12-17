@@ -1,5 +1,7 @@
 package com.loopers.application.order;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.loopers.application.payment.PaymentProcessor;
 import com.loopers.domain.activity.event.UserActivityEvent;
 import com.loopers.domain.coupon.Coupon;
@@ -10,6 +12,7 @@ import com.loopers.domain.issuedcoupon.IssuedCouponService;
 import com.loopers.domain.order.Order;
 import com.loopers.domain.order.OrderService;
 import com.loopers.domain.order.event.OrderCreatedEvent;
+import com.loopers.domain.outbox.OutboxEventService;
 import com.loopers.domain.payment.PaymentType;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductService;
@@ -18,13 +21,14 @@ import com.loopers.domain.user.UserService;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @RequiredArgsConstructor
 @Component
 public class OrderFacade {
@@ -36,7 +40,9 @@ public class OrderFacade {
     private final IssuedCouponService issuedCouponService;
 
     private final PaymentProcessor paymentProcessor;
-    private final ApplicationEventPublisher eventPublisher;
+
+    private final OutboxEventService outboxEventService;
+    private final ObjectMapper objectMapper;
 
     @Transactional
     public OrderInfo createOrder(OrderCommand command) {
@@ -82,37 +88,16 @@ public class OrderFacade {
             );
         }
 
-        // 8. 쿠폰 사용 처리
+        // 8. 쿠폰 사용 처리 (이벤트 발행 실패 시에도 주문은 성공 처리)
         if (issuedCoupon != null) {
-            eventPublisher.publishEvent(
-                    CouponUsedEvent.of(
-                            user.getId(),
-                            coupon.getId(),
-                            savedOrder.getId(),
-                            order.getTotalPrice()
-                    )
-            );
+            publishCouponUsedEvent(user, coupon, savedOrder, order);
         }
 
-        // 9. 주문 생성 완료 이벤트 발행
-        eventPublisher.publishEvent(
-                OrderCreatedEvent.of(
-                        savedOrder.getId(),
-                        user.getId(),
-                        savedOrder.getTotalPrice().getAmount(),
-                        command.paymentType()
-                )
-        );
+        // 9. 주문 생성 완료 이벤트 발행 (이벤트 발행 실패 시에도 주문은 성공 처리)
+        publishOrderCreatedEvent(savedOrder, user, command);
 
-        // 10. 사용자 행동 추적 이벤트 발행
-        eventPublisher.publishEvent(
-                UserActivityEvent.of(
-                        user.getUserId(),
-                        "ORDER_CREATED",
-                        "ORDER",
-                        order.getId()
-                )
-        );
+        // 10. 사용자 행동 추적 이벤트 발행 (이벤트 발행 실패 시에도 주문은 성공 처리)
+        publishUserActivityEvent(user, savedOrder);
 
         return OrderInfo.from(savedOrder);
     }
@@ -132,5 +117,89 @@ public class OrderFacade {
             productQuantities.put(product, item.quantity());
         }
         return productQuantities;
+    }
+
+    /**
+     * 쿠폰 사용 이벤트 발행
+     * 실패 시에도 주문 트랜잭션에 영향을 주지 않음
+     */
+    private void publishCouponUsedEvent(User user, Coupon coupon, Order savedOrder, Order order) {
+        try {
+            CouponUsedEvent couponUsedEvent = CouponUsedEvent.of(
+                    user.getId(),
+                    coupon.getId(),
+                    savedOrder.getId(),
+                    order.getTotalPrice()
+            );
+
+            String couponUsePayload = objectMapper.writeValueAsString(couponUsedEvent);
+
+            outboxEventService.createOutboxEvent(
+                    "COUPON",
+                    savedOrder.getId().toString(),
+                    "CouponUsed",
+                    couponUsePayload
+            );
+        } catch (JsonProcessingException e) {
+            // 이벤트 발행 실패 시 로그만 남기고 주문은 성공 처리
+            log.error("CouponUsedEvent 직렬화 실패 - 주문은 성공 처리됨. orderId: {}, couponId: {}",
+                    savedOrder.getId(), coupon.getId(), e);
+        }
+    }
+
+    /**
+     * 주문 생성 이벤트 발행
+     * 실패 시에도 주문 트랜잭션에 영향을 주지 않음
+     */
+    private void publishOrderCreatedEvent(Order savedOrder, User user, OrderCommand command) {
+        try {
+            OrderCreatedEvent orderCreatedEvent = OrderCreatedEvent.of(
+                    savedOrder.getId(),
+                    user.getId(),
+                    savedOrder.getTotalPrice().getAmount(),
+                    command.paymentType()
+            );
+
+            String orderCreatePayload = objectMapper.writeValueAsString(orderCreatedEvent);
+
+            outboxEventService.createOutboxEvent(
+                    "ORDER",
+                    savedOrder.getId().toString(),
+                    "OrderCreated",
+                    orderCreatePayload
+            );
+        } catch (JsonProcessingException e) {
+            // 이벤트 발행 실패 시 로그만 남기고 주문은 성공 처리
+            log.error("OrderCreatedEvent 직렬화 실패 - 주문은 성공 처리됨. orderId: {}",
+                    savedOrder.getId(), e);
+        }
+    }
+
+    /**
+     * 사용자 활동 이벤트 발행
+     * 실패 시에도 주문 트랜잭션에 영향을 주지 않음
+     */
+    private void publishUserActivityEvent(User user, Order savedOrder) {
+        try {
+            UserActivityEvent userActivityEvent = UserActivityEvent.of(
+                    user.getUserId(),
+                    "ORDER_CREATED",
+                    "ORDER",
+                    savedOrder.getId()
+            );
+
+            String userActivityPayload = objectMapper.writeValueAsString(userActivityEvent);
+
+            outboxEventService.createOutboxEvent(
+                    "ACTIVITY",
+                    savedOrder.getId().toString(),
+                    "UserActivity",
+                    userActivityPayload
+            );
+        } catch (JsonProcessingException e) {
+            // 이벤트 발행 실패 시 로그만 남기고 주문은 성공 처리
+            log.error("UserActivityEvent 직렬화 실패 - 주문은 성공 처리됨. orderId: {}, userId: {}",
+                    savedOrder.getId(), user.getId(), e);
+        }
     }
 }
