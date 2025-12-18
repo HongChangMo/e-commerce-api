@@ -1,0 +1,63 @@
+spring:
+  application:
+    name: commerce-collector
+  profiles:
+    active: local
+  config:
+    import:
+      - jpa.yml
+      - redis.yml
+      - kafka.yml
+      - logging.yml
+
+server:
+  port: 8888
+
+management:
+  server:
+    port: 8889
+
+# Collector 전용 Kafka 설정 override
+---
+spring:
+  config:
+    activate:
+      on-profile: local, test
+  kafka:
+    consumer:
+      group-id: commerce-collector-group
+      auto-offset-reset: latest
+      properties:
+        max.poll.records: 10
+        enable.auto.commit: false
+    listener:
+      concurrency: 3
+      ack-mode: manual
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local, test
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+---
+spring:
+  config:
+    activate:
+      on-profile: qa
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prd
+
+springdoc:
+  api-docs:
+    enabled: false
