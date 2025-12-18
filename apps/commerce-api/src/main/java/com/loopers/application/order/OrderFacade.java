@@ -18,6 +18,7 @@ import com.loopers.domain.product.Product;
 import com.loopers.domain.product.ProductService;
 import com.loopers.domain.user.User;
 import com.loopers.domain.user.UserService;
+import com.loopers.kafka.AggregateTypes;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.Map;
+
+import static com.loopers.kafka.KafkaTopics.Order.*;
+import static com.loopers.kafka.KafkaTopics.UserActivity;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -135,9 +139,9 @@ public class OrderFacade {
             String couponUsePayload = objectMapper.writeValueAsString(couponUsedEvent);
 
             outboxEventService.createOutboxEvent(
-                    "COUPON",
+                    AggregateTypes.COUPON,
                     savedOrder.getId().toString(),
-                    "CouponUsed",
+                    com.loopers.kafka.KafkaTopics.Coupon.COUPON_USED,
                     couponUsePayload
             );
         } catch (JsonProcessingException e) {
@@ -163,9 +167,9 @@ public class OrderFacade {
             String orderCreatePayload = objectMapper.writeValueAsString(orderCreatedEvent);
 
             outboxEventService.createOutboxEvent(
-                    "ORDER",
+                    AggregateTypes.ORDER,
                     savedOrder.getId().toString(),
-                    "OrderCreated",
+                    ORDER_CREATED,
                     orderCreatePayload
             );
         } catch (JsonProcessingException e) {
@@ -191,9 +195,9 @@ public class OrderFacade {
             String userActivityPayload = objectMapper.writeValueAsString(userActivityEvent);
 
             outboxEventService.createOutboxEvent(
-                    "ACTIVITY",
+                    AggregateTypes.ACTIVITY,
                     savedOrder.getId().toString(),
-                    "UserActivity",
+                    UserActivity.USER_ACTIVITY,
                     userActivityPayload
             );
         } catch (JsonProcessingException e) {

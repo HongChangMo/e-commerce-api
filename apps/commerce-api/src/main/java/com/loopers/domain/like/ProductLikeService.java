@@ -8,12 +8,16 @@ import com.loopers.domain.like.event.ProductLikeRemovedEvent;
 import com.loopers.domain.outbox.OutboxEventService;
 import com.loopers.domain.product.Product;
 import com.loopers.domain.user.User;
+import com.loopers.kafka.AggregateTypes;
 import com.loopers.support.error.CoreException;
 import com.loopers.support.error.ErrorType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
+import static com.loopers.kafka.KafkaTopics.ProductLike.*;
+import static com.loopers.kafka.KafkaTopics.UserActivity;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -59,9 +63,9 @@ public class ProductLikeService {
             String likeAddedPayload = objectMapper.writeValueAsString(productLikeAddedEvent);
 
             outboxEventService.createOutboxEvent(
-                    "PRODUCT_LIKE",
-                    savedLike.getId().toString(),
-                    "LikeAdded",
+                    AggregateTypes.PRODUCT_LIKE,
+                    product.getId().toString(),
+                    LIKE_ADDED,
                     likeAddedPayload
             );
         } catch (JsonProcessingException e) {
@@ -87,9 +91,9 @@ public class ProductLikeService {
             String userActivityPayload = objectMapper.writeValueAsString(userActivityEvent);
 
             outboxEventService.createOutboxEvent(
-                    "ACTIVITY",
+                    AggregateTypes.ACTIVITY,
                     product.getId().toString(),
-                    "UserActivity",
+                    UserActivity.USER_ACTIVITY,
                     userActivityPayload
             );
         } catch (JsonProcessingException e) {
@@ -128,9 +132,9 @@ public class ProductLikeService {
             String likeRemovedPayload = objectMapper.writeValueAsString(productLikeRemovedEvent);
 
             outboxEventService.createOutboxEvent(
-                    "PRODUCT_LIKE",
-                    like.getId().toString(),
-                    "LikeRemoved",
+                    AggregateTypes.PRODUCT_LIKE,
+                    product.getId().toString(),
+                    LIKE_REMOVED,
                     likeRemovedPayload
             );
         } catch (JsonProcessingException e) {

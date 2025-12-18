@@ -3,7 +3,7 @@ package com.loopers.application.outbox;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.loopers.domain.outbox.OutboxEvent;
 import com.loopers.domain.outbox.OutboxEventService;
-import com.loopers.infrastructure.kafka.KafkaTopics;
+import com.loopers.kafka.KafkaTopics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -42,22 +42,25 @@ public class OutboxEventPublisher {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void publishEvent(OutboxEvent outboxEvent) {
         try {
-            // 토픽 결정
-            String topic = determineTopicByEventType(outboxEvent.getEventType());
+            // 토픽 결정 (aggregateType 기반)
+            String topic = determineTopicByAggregateType(outboxEvent.getAggregateType());
+
+            // 전체 메시지 구조 생성 (Consumer가 기대하는 형식)
+            String message = createEventMessage(outboxEvent);
 
             // Kafka 발행
             kafkaTemplate.send(
                     topic,
                     outboxEvent.getAggregateId(),  // Partition Key
-                    objectMapper.readValue(outboxEvent.getPayload(), Object.class)
+                    message  // JSON String으로 전송
             ).get();  // 동기 대기 (발행 보장)
 
             // 발행 성공 시 상태 업데이트
             outboxEvent.markAsPublished();
             outboxEventService.save(outboxEvent);
 
-            log.info("Outbox 이벤트 발행 완료 - id: {}, type: {}",
-                    outboxEvent.getId(), outboxEvent.getEventType());
+            log.info("Outbox 이벤트 발행 완료 - id: {}, aggregateType: {}, eventType: {}",
+                    outboxEvent.getId(), outboxEvent.getAggregateType(), outboxEvent.getEventType());
 
         } catch (Exception e) {
             log.error("Kafka 발행 실패 - Outbox id: {}", outboxEvent.getId(), e);
@@ -66,16 +69,29 @@ public class OutboxEventPublisher {
         }
     }
 
-    private String determineTopicByEventType(String eventType) {
-        return switch (eventType) {
-            case "LikeAdded" -> KafkaTopics.PRODUCT_LIKE_ADDED;
-            case "LikeRemoved" -> KafkaTopics.PRODUCT_LIKE_REMOVED;
-            case "ViewIncreased" -> KafkaTopics.PRODUCT_VIEW_INCREASED;
-            case "OrderCreated" -> KafkaTopics.ORDER_CREATED;
-            case "OrderCompleted" -> KafkaTopics.ORDER_COMPLETED;
-            case "CouponUsed" -> KafkaTopics.COUPON_USED;
-            case "UserActivity" -> KafkaTopics.USER_ACTIVITY;
-            default -> throw new IllegalArgumentException("Unknown event type: " + eventType);
+    private String createEventMessage(OutboxEvent outboxEvent) throws Exception {
+        // payload를 Object로 파싱
+        Object payloadObject = objectMapper.readValue(outboxEvent.getPayload(), Object.class);
+
+        // 전체 메시지 구조 생성
+        var message = java.util.Map.of(
+                "eventId", java.util.UUID.randomUUID().toString(),
+                "eventType", outboxEvent.getEventType(),
+                "aggregateType", outboxEvent.getAggregateType(),
+                "aggregateId", outboxEvent.getAggregateId(),
+                "payload", payloadObject
+        );
+
+        return objectMapper.writeValueAsString(message);
+    }
+
+    private String determineTopicByAggregateType(String aggregateType) {
+        return switch (aggregateType) {
+            case "PRODUCT_LIKE" -> KafkaTopics.PRODUCT_LIKE;
+            case "ORDER" -> KafkaTopics.ORDER;
+            case "COUPON" -> KafkaTopics.COUPON;
+            case "ACTIVITY" -> KafkaTopics.USER_ACTIVITY;
+            default -> throw new IllegalArgumentException("Unknown aggregate type: " + aggregateType);
         };
     }
 }
