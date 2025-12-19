@@ -3,6 +3,7 @@ package com.loopers.kafka;
 public final class KafkaTopics {
 
     public static final String PRODUCT_LIKE = "product.like";
+    public static final String PRODUCT = "product";
     public static final String ORDER = "order";
     public static final String COUPON = "coupon";
     public static final String USER_ACTIVITY = "user.activity";
@@ -16,10 +17,10 @@ public final class KafkaTopics {
         }
     }
 
-    public static final class ProductView {
-        public static final String VIEW_INCREASED = "ViewIncreased";
+    public static final class ProductDetail {
+        public static final String PRODUCT_VIEWED = "ProductViewed";
 
-        private ProductView() {
+        private ProductDetail() {
             throw new AssertionError("Cannot instantiate utility class");
         }
     }
