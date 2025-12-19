@@ -4,11 +4,8 @@ import com.loopers.application.product.cache.ProductCacheService;
 import com.loopers.domain.eventhandled.EventHandledService;
 import com.loopers.domain.metrics.ProductMetricsService;
 import com.loopers.domain.stock.StockThresholdChecker;
-import com.loopers.infrastructure.client.ProductApiClient;
+import com.loopers.infrastructure.client.ProductApiGateway;
 import com.loopers.infrastructure.client.dto.ProductDetailExternalDto;
-import com.loopers.support.error.CoreException;
-import com.loopers.support.error.ErrorType;
-import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -21,7 +18,7 @@ public class OrderEventHandler {
 
     private final EventHandledService eventHandledService;
     private final ProductMetricsService productMetricsService;
-    private final ProductApiClient productApiClient;
+    private final ProductApiGateway productApiGateway;
     private final StockThresholdChecker stockThresholdChecker;
     private final ProductCacheService productCacheService;
 
@@ -59,19 +56,10 @@ public class OrderEventHandler {
 
     /**
      * commerce-api에서 현재 재고 조회
+     * CircuitBreaker와 Retry는 ProductApiGateway에서 처리
      */
     private int getCurrentStock(Long productId) {
-        try {
-            ProductDetailExternalDto.ProductDetailResponse product = productApiClient.getProductDetail(productId);
-            return product.getStockQuantity();
-        } catch (FeignException.NotFound e) {
-            log.error("상품을 찾을 수 없음 - productId: {}", productId, e);
-            throw new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다");
-        } catch (FeignException e) {
-            log.error("상품 정보 조회 실패 - productId: {}", productId, e);
-            // Feign 실패 시 기본값 반환 (캐시 무효화하지 않음)
-            // 재시도 로직은 Kafka Consumer의 재처리로 커버
-            throw new CoreException(ErrorType.BAD_REQUEST, "상품 정보 조회 실패");
-        }
+        ProductDetailExternalDto.ProductDetailResponse product = productApiGateway.getProductDetail(productId);
+        return product.getStockQuantity();
     }
 }
