@@ -6,6 +6,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 @Component
 @RequiredArgsConstructor
 public class EventHandledFacade {
@@ -29,5 +32,27 @@ public class EventHandledFacade {
                 eventId, eventType, aggregateType, aggregateId
         );
         eventHandledRepository.save(eventHandled);
+    }
+
+    /**
+     * 이벤트 처리 완료 기록 (배치)
+     * - 대량 이벤트 처리 시 성능 향상
+     */
+    @Transactional
+    public void markAsHandledBatch(List<EventHandledInfo> eventInfos) {
+        if (eventInfos == null || eventInfos.isEmpty()) {
+            return;
+        }
+
+        List<EventHandled> eventHandledList = eventInfos.stream()
+                .map(info -> EventHandled.create(
+                        info.eventId(),
+                        info.eventType(),
+                        info.aggregateType(),
+                        info.aggregateId()
+                ))
+                .collect(Collectors.toList());
+
+        eventHandledRepository.saveAll(eventHandledList);
     }
 }
