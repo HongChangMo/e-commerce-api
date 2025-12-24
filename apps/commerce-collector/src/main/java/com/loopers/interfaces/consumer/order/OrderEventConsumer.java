@@ -51,17 +51,32 @@ public class OrderEventConsumer {
 
             // 이벤트 타입별 처리
             if( KafkaTopics.Order.ORDER_CREATED.equals(eventType) ) {
-                // 이벤트별 필드 검증
-                if (!payload.has("productId") || !payload.has("quantity")) {
-                    log.error("잘못된 ORDER_CREATED 형식 - eventId: {}, payload: {}", eventId, payload);
+                // 이벤트별 필드 검증 - items 배열 존재 확인
+                if (!payload.has("items") || !payload.get("items").isArray()) {
+                    log.error("잘못된 ORDER_CREATED 형식 - items 배열 누락 또는 잘못된 형식 - eventId: {}, payload: {}", eventId, payload);
                     acknowledgment.acknowledge();  // 재시도 방지
                     return;
                 }
 
-                Long productId = payload.get("productId").asLong();
-                int quantity = payload.get("quantity").asInt();
+                // 주문 내 각 상품별로 처리
+                JsonNode items = payload.get("items");
+                for (int i = 0; i < items.size(); i++) {
+                    JsonNode item = items.get(i);
 
-                orderEventHandler.handleOrderCreated(eventId, productId, quantity);
+                    // 상품별 필드 검증
+                    if (!item.has("productId") || !item.has("quantity")) {
+                        log.error("잘못된 OrderItem 형식 - eventId: {}, item: {}", eventId, item);
+                        continue;  // 해당 상품만 스킵하고 다음 상품 처리
+                    }
+
+                    Long productId = item.get("productId").asLong();
+                    int quantity = item.get("quantity").asInt();
+
+                    // 상품별 고유 eventId 생성 (멱등성 보장)
+                    String itemEventId = eventId + "-" + productId;
+
+                    orderEventHandler.handleOrderCreated(itemEventId, productId, quantity);
+                }
             }
 
             // 수동 커밋
