@@ -66,6 +66,14 @@ public class RankingFacade {
     }
 
     /**
+     * 종합 랭킹 증분 업데이트 (가중치 합산)
+     * - Score = (likeDelta × 0.2) + (viewDelta × 0.1) + (orderDelta × 0.6)
+     */
+    public void incrementProductAllRanking(Map<Long, Double> compositeScores) {
+        incrementRankingWithCompositeScores(ALL_RANKING_KEY_PREFIX, compositeScores);
+    }
+
+    /**
      * 랭킹 증분 업데이트 공통 로직 (가중치 적용)
      * @param prefix 랭킹 키 prefix (like/view/order)
      * @param deltas 상품별 증감량
@@ -100,6 +108,45 @@ public class RankingFacade {
 
             log.info("{} 랭킹 증분 업데이트 완료 (가중치: {}) - 키: {}, 항목 수: {}",
                     prefix, weight, todayKey, deltas.size());
+
+        } catch (Exception e) {
+            log.error("{} 랭킹 증분 업데이트 실패 - 키: {}", prefix, todayKey, e);
+            throw new RuntimeException("랭킹 증분 업데이트 실패: " + todayKey, e);
+        }
+    }
+
+    /**
+     * 종합 점수로 랭킹 증분 업데이트 (가중치 이미 적용된 점수)
+     * @param prefix 랭킹 키 prefix
+     * @param compositeScores 상품별 종합 점수 (Double)
+     */
+    private void incrementRankingWithCompositeScores(String prefix, Map<Long, Double> compositeScores) {
+        if (compositeScores == null || compositeScores.isEmpty()) {
+            log.warn("종합 점수 없음, {} 랭킹 갱신 스킵", prefix);
+            return;
+        }
+
+        String todayKey = prefix + ":" + LocalDate.now().format(DATE_FORMATTER);
+
+        try {
+            redisTemplate.executePipelined(new SessionCallback<Object>() {
+                @Override
+                public Object execute(RedisOperations operations) throws DataAccessException {
+                    ZSetOperations<String, String> zSetOps = operations.opsForZSet();
+
+                    for (Map.Entry<Long, Double> entry : compositeScores.entrySet()) {
+                        if (entry.getValue() == 0.0) continue;
+
+                        zSetOps.incrementScore(todayKey, entry.getKey().toString(), entry.getValue());
+                    }
+
+                    operations.expire(todayKey, rankingTtlDays, TimeUnit.DAYS);
+                    return null;
+                }
+            });
+
+            log.info("{} 랭킹 증분 업데이트 완료 - 키: {}, 항목 수: {}",
+                    prefix, todayKey, compositeScores.size());
 
         } catch (Exception e) {
             log.error("{} 랭킹 증분 업데이트 실패 - 키: {}", prefix, todayKey, e);
