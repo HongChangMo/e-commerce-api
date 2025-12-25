@@ -27,7 +27,7 @@ public class ProductMetricsDailyFacade {
     /**
      * 일자별 조회수 증감 배치 업데이트
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.REQUIRED)
     public void updateViewDeltaBatch(Map<Long, Integer> viewDeltas, LocalDate metricDate) {
         productMetricsDailyRepository.upsertViewDeltas(viewDeltas, metricDate);
     }

@@ -1,10 +1,10 @@
-package com.loopers.application.like;
+package com.loopers.application.product;
 
 import com.loopers.application.eventhandled.EventHandledFacade;
 import com.loopers.application.eventhandled.EventHandledInfo;
 import com.loopers.application.metrics.ProductMetricsDailyFacade;
 import com.loopers.application.metrics.ProductMetricsFacade;
-import com.loopers.interfaces.consumer.like.dto.ProductLikeEvent;
+import com.loopers.interfaces.consumer.product.dto.ProductEvent;
 import com.loopers.kafka.AggregateTypes;
 import com.loopers.kafka.KafkaTopics;
 import lombok.RequiredArgsConstructor;
@@ -22,99 +22,97 @@ import java.util.stream.Collectors;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class ProductLikeBatchEventHandler {
+public class ProductBatchEventHandler {
 
     private final EventHandledFacade eventHandledFacade;
     private final ProductMetricsFacade productMetricsFacade;
     private final ProductMetricsDailyFacade productMetricsDailyFacade;
 
     @Transactional
-    public void handleProductLikeBatch(List<ProductLikeEvent> events) {
+    public void handleProductViewBatch(List<ProductEvent> events) {
         try {
-            log.info("좋아요 배치 처리 시작 - 전체 이벤트 수: {}", events.size());
+            log.info("상품 조회 이벤트 배치 처리 시작 - 전체 이벤트 수: {}", events.size());
 
-            List<ProductLikeEvent> unprocessedEvents = filterUnprocessedEvents(events);
+            List<ProductEvent> unprocessedEvents = filterUnprocessedEvents(events);
+
             if (unprocessedEvents.isEmpty()) {
                 log.info("처리할 이벤트 없음 (모두 중복)");
                 return;
             }
 
-            Map<String, ProductLikeEvent> uniqueEvents = removeDuplicates(unprocessedEvents);
-            Map<Long, Integer> likeDeltas = calculateLikeDeltas(uniqueEvents.values());
+            Map<String, ProductEvent> uniqueEvents = removeDuplicates(unprocessedEvents);
+            Map<Long, Integer> viewDeltas = calculateViewDeltas(uniqueEvents.values());
 
-            log.info("증감량 계산 완료 - 처리 대상 상품 수: {}", likeDeltas.size());
+            log.info("증감량 계산 완료 - 처리 대상 상품 수: {}", viewDeltas.size());
 
-            updateMetrics(likeDeltas);
+            updateMetrics(viewDeltas);
             markEventsAsHandled(uniqueEvents.values());
 
-            log.info("좋아요 배치 처리 완료 - 전체: {}, 미처리: {}, 실제 처리: {}",
-                    events.size(), unprocessedEvents.size(), uniqueEvents.size());
-
-        } catch (Exception e) {
-            log.error("좋아요 배치 처리 실패 - 전체 트랜잭션 롤백됨 | 이벤트 수: {}", events.size(), e);
-            throw new RuntimeException("좋아요 배치 처리 실패", e);
+        } catch(Exception e) {
+            log.error("상품 조회 이벤트 처리 실패 - 전체 트랜잭션 롤백됨 | 이벤트 수: {}", events.size(), e);
+            throw new RuntimeException("상품 조회 이벤트 배치 처리 실패", e);
         }
     }
 
-    private List<ProductLikeEvent> filterUnprocessedEvents(List<ProductLikeEvent> events) {
+    private List<ProductEvent> filterUnprocessedEvents(List<ProductEvent> events) {
         return events.stream()
                 .filter(event -> !eventHandledFacade.isAlreadyHandled(event.eventId()))
                 .collect(Collectors.toList());
     }
 
-    private Map<String, ProductLikeEvent> removeDuplicates(List<ProductLikeEvent> events) {
+    private Map<String, ProductEvent> removeDuplicates(List<ProductEvent> events) {
         return events.stream()
                 .collect(Collectors.toMap(
-                        ProductLikeEvent::eventId,
+                        ProductEvent::eventId,
                         event -> event,
                         (existing, replacement) -> existing
                 ));
     }
 
-    private Map<Long, Integer> calculateLikeDeltas(Iterable<ProductLikeEvent> events) {
-        Map<Long, Integer> likeDeltas = new HashMap<>();
+    private Map<Long, Integer> calculateViewDeltas(Iterable<ProductEvent> events) {
+        Map<Long, Integer> viewDeltas = new HashMap<>();
 
-        for (ProductLikeEvent event : events) {
+        for(ProductEvent event : events) {
             int delta = calculateDelta(event.eventType());
-            likeDeltas.merge(event.productId(), delta, Integer::sum);
+            viewDeltas.merge(event.productId(), delta, Integer::sum);
         }
 
-        return likeDeltas;
+        return viewDeltas;
     }
 
     private int calculateDelta(String eventType) {
-        if (KafkaTopics.ProductLike.LIKE_ADDED.equals(eventType)) {
+
+        if(KafkaTopics.ProductDetail.PRODUCT_VIEWED.equals(eventType)) {
             return 1;
-        } else if (KafkaTopics.ProductLike.LIKE_REMOVED.equals(eventType)) {
-            return -1;
         }
         return 0;
     }
 
-    private void updateMetrics(Map<Long, Integer> likeDeltas) {
-        productMetricsFacade.updateLikeCountBatch(likeDeltas);
+    private void updateMetrics(Map<Long, Integer> viewDeltas) {
+        productMetricsFacade.updateViewCountBatch(viewDeltas);
         log.info("ProductMetrics 업데이트 완료");
 
-        productMetricsDailyFacade.updateLikeDeltaBatch(likeDeltas, LocalDate.now());
+        productMetricsDailyFacade.updateViewDeltaBatch(viewDeltas, LocalDate.now());
         log.info("ProductMetricsDaily 업데이트 완료");
     }
 
-    private void markEventsAsHandled(Iterable<ProductLikeEvent> events) {
+    private void markEventsAsHandled(Iterable<ProductEvent> events) {
         List<EventHandledInfo> eventHandledInfos = createEventHandledInfos(events);
         eventHandledFacade.markAsHandledBatch(eventHandledInfos);
         log.info("이벤트 처리 완료 기록");
     }
 
-    private List<EventHandledInfo> createEventHandledInfos(Iterable<ProductLikeEvent> events) {
+    private List<EventHandledInfo> createEventHandledInfos(Iterable<ProductEvent> events) {
         List<EventHandledInfo> infos = new ArrayList<>();
-        for (ProductLikeEvent event : events) {
+        for(ProductEvent event : events) {
             infos.add(EventHandledInfo.of(
                     event.eventId(),
                     event.eventType(),
-                    AggregateTypes.PRODUCT_LIKE,
+                    AggregateTypes.PRODUCT_VIEW,
                     event.productId().toString()
             ));
         }
+
         return infos;
     }
 }
