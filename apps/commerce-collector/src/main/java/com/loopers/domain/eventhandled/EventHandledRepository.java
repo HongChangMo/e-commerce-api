@@ -8,4 +8,9 @@ public interface EventHandledRepository {
     void saveAll(List<EventHandled> eventHandledList);
 
     List<EventHandled> findByEventId(String eventId);
+
+    /**
+     * 여러 eventId에 해당하는 EventHandled 조회 (N+1 방지)
+     */
+    List<EventHandled> findAllByEventIdIn(List<String> eventIds);
 }

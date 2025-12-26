@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
@@ -20,6 +21,23 @@ public class EventHandledFacade {
     @Transactional(readOnly = true)
     public boolean isAlreadyHandled(String eventId) {
         return eventHandledRepository.existsByEventId(eventId);
+    }
+
+    /**
+     * 여러 이벤트 중 이미 처리된 이벤트 ID 조회 (N+1 방지)
+     * @param eventIds 확인할 이벤트 ID 목록
+     * @return 이미 처리된 이벤트 ID Set
+     */
+    @Transactional(readOnly = true)
+    public Set<String> findAlreadyHandledEventIds(List<String> eventIds) {
+        if (eventIds == null || eventIds.isEmpty()) {
+            return Set.of();
+        }
+
+        return eventHandledRepository.findAllByEventIdIn(eventIds)
+                .stream()
+                .map(EventHandled::getEventId)
+                .collect(Collectors.toSet());
     }
 
     /**

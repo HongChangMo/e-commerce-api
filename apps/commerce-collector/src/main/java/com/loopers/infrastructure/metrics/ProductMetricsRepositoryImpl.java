@@ -107,8 +107,8 @@ public class ProductMetricsRepositoryImpl implements ProductMetricsRepository {
     }
 
     @Override
-    public void upsertOrderDeltas(Map<Long, Integer> orderDeltas) {
-        if (orderDeltas.isEmpty()) {
+    public void upsertOrderDeltas(Map<Long, com.loopers.application.order.OrderMetrics> orderMetrics) {
+        if (orderMetrics.isEmpty()) {
             return;
         }
 
@@ -122,15 +122,15 @@ public class ProductMetricsRepositoryImpl implements ProductMetricsRepository {
                 updated_at = NOW()
             """;
 
-        List<Map.Entry<Long, Integer>> entries = new ArrayList<>(orderDeltas.entrySet());
+        List<Map.Entry<Long, com.loopers.application.order.OrderMetrics>> entries = new ArrayList<>(orderMetrics.entrySet());
 
         jdbcTemplate.batchUpdate(sql, new BatchPreparedStatementSetter() {
             @Override
             public void setValues(PreparedStatement ps, int i) throws SQLException {
-                Map.Entry<Long, Integer> entry = entries.get(i);
+                Map.Entry<Long, com.loopers.application.order.OrderMetrics> entry = entries.get(i);
                 ps.setLong(1, entry.getKey());
-                ps.setInt(2, entry.getValue());
-                ps.setInt(3, entry.getValue());
+                ps.setInt(2, entry.getValue().getOrderCount());      // 주문 건수
+                ps.setInt(3, entry.getValue().getTotalQuantity());   // 총 주문 수량
             }
 
             @Override
@@ -139,6 +139,6 @@ public class ProductMetricsRepositoryImpl implements ProductMetricsRepository {
             }
         });
 
-        log.info("주문 수 Upsert 완료 - {} 건", entries.size());
+        log.info("주문 메트릭 Upsert 완료 - {} 건 (건수와 수량 분리 처리)", entries.size());
     }
 }

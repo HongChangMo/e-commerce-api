@@ -26,5 +26,8 @@ public interface ProductJpaRepository extends JpaRepository<Product, Long>, JpaS
     @Query("select p from Product p where p.id = :id")
     Optional<Product> findByIdWithLock(@Param("id") Long id);
 
-    List<Product> findAllByIdIn(List<Long> productIds);
+    @Query("SELECT DISTINCT p FROM Product p " +
+            "LEFT JOIN FETCH p.brand " +
+            "WHERE p.id IN :productIds")
+    List<Product> findAllByIdIn(@Param("productIds") List<Long> productIds);
 }

@@ -16,6 +16,7 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -29,8 +30,12 @@ public class OrderBatchEventHandler {
 
     @Transactional
     public void handleOrderBatch(List<OrderEvent> events) {
+        // 자정 경계 문제 방지: 트랜잭션 시작 시점의 날짜를 캡처하여 일관성 보장
+        LocalDate processingDate = LocalDate.now();
+
         try {
-            log.info("주문 배치 처리 시작 - 전체 이벤트 수: {}", events.size());
+            log.info("주문 배치 처리 시작 - 전체 이벤트 수: {}, 처리 날짜: {}",
+                events.size(), processingDate);
 
             List<OrderEvent> unprocessedEvents = filterUnprocessedEvents(events);
             if (unprocessedEvents.isEmpty()) {
@@ -39,16 +44,16 @@ public class OrderBatchEventHandler {
             }
 
             Map<String, OrderEvent> uniqueEvents = removeDuplicates(unprocessedEvents);
-            Map<Long, Integer> orderDeltas = aggregateOrderQuantities(uniqueEvents.values());
+            Map<Long, OrderMetrics> orderMetrics = aggregateOrderMetrics(uniqueEvents.values());
 
-            if (orderDeltas.isEmpty()) {
+            if (orderMetrics.isEmpty()) {
                 log.info("집계할 주문 데이터 없음");
                 return;
             }
 
-            log.info("주문 수량 집계 완료 - 처리 대상 상품 수: {}", orderDeltas.size());
+            log.info("주문 메트릭 집계 완료 - 처리 대상 상품 수: {}", orderMetrics.size());
 
-            updateMetrics(orderDeltas);
+            updateMetrics(orderMetrics, processingDate);
             markEventsAsHandled(uniqueEvents.values());
 
             log.info("주문 배치 처리 완료 - 전체: {}, 미처리: {}, 실제 처리: {}",
@@ -61,8 +66,15 @@ public class OrderBatchEventHandler {
     }
 
     private List<OrderEvent> filterUnprocessedEvents(List<OrderEvent> events) {
+        // N+1 방지: 한 번의 쿼리로 모든 처리된 이벤트 ID 조회
+        List<String> eventIds = events.stream()
+                .map(OrderEvent::eventId)
+                .collect(Collectors.toList());
+
+        Set<String> handledEventIds = eventHandledFacade.findAlreadyHandledEventIds(eventIds);
+
         return events.stream()
-                .filter(event -> !eventHandledFacade.isAlreadyHandled(event.eventId()))
+                .filter(event -> !handledEventIds.contains(event.eventId()))
                 .collect(Collectors.toList());
     }
 
@@ -75,8 +87,13 @@ public class OrderBatchEventHandler {
                 ));
     }
 
-    private Map<Long, Integer> aggregateOrderQuantities(Iterable<OrderEvent> events) {
-        Map<Long, Integer> orderDeltas = new HashMap<>();
+    /**
+     * 주문 메트릭 집계 (건수와 수량 분리)
+     * - orderCount: 해당 상품이 포함된 주문 건수
+     * - totalQuantity: 해당 상품의 총 주문 수량
+     */
+    private Map<Long, OrderMetrics> aggregateOrderMetrics(Iterable<OrderEvent> events) {
+        Map<Long, OrderMetrics> metricsMap = new HashMap<>();
 
         for (OrderEvent event : events) {
             if (!KafkaTopics.Order.ORDER_CREATED.equals(event.eventType())) {
@@ -85,13 +102,13 @@ public class OrderBatchEventHandler {
                 continue;
             }
 
-            processOrderCreatedEvent(event, orderDeltas);
+            processOrderCreatedEvent(event, metricsMap);
         }
 
-        return orderDeltas;
+        return metricsMap;
     }
 
-    private void processOrderCreatedEvent(OrderEvent event, Map<Long, Integer> orderDeltas) {
+    private void processOrderCreatedEvent(OrderEvent event, Map<Long, OrderMetrics> metricsMap) {
         OrderEvent.OrderCreatedPayload payload = event.payload();
         if (payload == null || payload.items() == null) {
             log.error("잘못된 ORDER_CREATED 형식 - eventId: {}", event.eventId());
@@ -104,16 +121,20 @@ public class OrderBatchEventHandler {
                 continue;
             }
 
-            orderDeltas.merge(item.productId(), item.quantity(), Integer::sum);
+            metricsMap.merge(
+                item.productId(),
+                OrderMetrics.of(1, item.quantity()),  // 건수: 1, 수량: item.quantity()
+                (existing, newMetrics) -> existing.add(newMetrics.getTotalQuantity())
+            );
         }
     }
 
-    private void updateMetrics(Map<Long, Integer> orderDeltas) {
-        productMetricsFacade.updateOrderCountBatch(orderDeltas);
+    private void updateMetrics(Map<Long, OrderMetrics> orderMetrics, LocalDate processingDate) {
+        productMetricsFacade.updateOrderMetricsBatch(orderMetrics);
         log.info("ProductMetrics 업데이트 완료");
 
-        productMetricsDailyFacade.updateOrderDeltaBatch(orderDeltas, LocalDate.now());
-        log.info("ProductMetricsDaily 업데이트 완료");
+        productMetricsDailyFacade.updateOrderMetricsBatch(orderMetrics, processingDate);
+        log.info("ProductMetricsDaily 업데이트 완료 - 처리 날짜: {}", processingDate);
     }
 
     private void markEventsAsHandled(Iterable<OrderEvent> events) {

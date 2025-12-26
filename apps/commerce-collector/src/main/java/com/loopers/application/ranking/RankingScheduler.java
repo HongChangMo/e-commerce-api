@@ -4,6 +4,7 @@ import com.loopers.domain.metrics.ProductMetricsDaily;
 import com.loopers.domain.metrics.ProductMetricsDailyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,15 @@ import java.util.stream.Stream;
 @Component
 @RequiredArgsConstructor
 public class RankingScheduler {
+
+    @Value("${ranking.weight.like:0.2}")
+    private double likeWeight;
+
+    @Value("${ranking.weight.view:0.1}")
+    private double viewWeight;
+
+    @Value("${ranking.weight.order:0.6}")
+    private double orderWeight;
 
     private final ProductMetricsDailyRepository productMetricsDailyRepository;
     private final RankingFacade rankingFacade;
@@ -91,7 +101,7 @@ public class RankingScheduler {
 
     /**
      * 종합 점수 계산
-     * - Score = (likeDelta × 0.2) + (viewDelta × 0.1) + (orderDelta × 0.6)
+     * - Score = (likeDelta * likeWeight) + (viewDelta * viewWeight) + (orderDelta * orderWeight);
      * @return 상품별 종합 점수
      */
     private Map<Long, Double> calculateCompositeScores(Map<Long, Integer> likeDeltas,
@@ -110,7 +120,7 @@ public class RankingScheduler {
             int viewDelta = viewDeltas.getOrDefault(productId, 0);
             int orderDelta = orderDeltas.getOrDefault(productId, 0);
 
-            double compositeScore = (likeDelta * 0.2) + (viewDelta * 0.1) + (orderDelta * 0.6);
+            double compositeScore = (likeDelta * likeWeight) + (viewDelta * viewWeight) + (orderDelta * orderWeight);
 
             if (compositeScore != 0.0) {
                 compositeScores.put(productId, compositeScore);

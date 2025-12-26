@@ -51,8 +51,8 @@ public class ProductMetricsFacade {
     }
 
     @Transactional(propagation = Propagation.REQUIRED)
-    public void updateOrderCountBatch(Map<Long, Integer> orderDeltas) {
-        productMetricsRepository.upsertOrderDeltas(orderDeltas);
+    public void updateOrderMetricsBatch(Map<Long, com.loopers.application.order.OrderMetrics> orderMetrics) {
+        productMetricsRepository.upsertOrderDeltas(orderMetrics);
     }
 
     private ProductMetrics getOrCreateMetrics(Long productId) {

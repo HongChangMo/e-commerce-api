@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -30,8 +31,12 @@ public class ProductBatchEventHandler {
 
     @Transactional
     public void handleProductViewBatch(List<ProductEvent> events) {
+        // 자정 경계 문제 방지: 트랜잭션 시작 시점의 날짜를 캡처하여 일관성 보장
+        LocalDate processingDate = LocalDate.now();
+
         try {
-            log.info("상품 조회 이벤트 배치 처리 시작 - 전체 이벤트 수: {}", events.size());
+            log.info("상품 조회 이벤트 배치 처리 시작 - 전체 이벤트 수: {}, 처리 날짜: {}",
+                events.size(), processingDate);
 
             List<ProductEvent> unprocessedEvents = filterUnprocessedEvents(events);
 
@@ -45,7 +50,7 @@ public class ProductBatchEventHandler {
 
             log.info("증감량 계산 완료 - 처리 대상 상품 수: {}", viewDeltas.size());
 
-            updateMetrics(viewDeltas);
+            updateMetrics(viewDeltas, processingDate);
             markEventsAsHandled(uniqueEvents.values());
 
         } catch(Exception e) {
@@ -55,8 +60,15 @@ public class ProductBatchEventHandler {
     }
 
     private List<ProductEvent> filterUnprocessedEvents(List<ProductEvent> events) {
+        // N+1 방지: 한 번의 쿼리로 모든 처리된 이벤트 ID 조회
+        List<String> eventIds = events.stream()
+                .map(ProductEvent::eventId)
+                .collect(Collectors.toList());
+
+        Set<String> handledEventIds = eventHandledFacade.findAlreadyHandledEventIds(eventIds);
+
         return events.stream()
-                .filter(event -> !eventHandledFacade.isAlreadyHandled(event.eventId()))
+                .filter(event -> !handledEventIds.contains(event.eventId()))
                 .collect(Collectors.toList());
     }
 
@@ -88,12 +100,12 @@ public class ProductBatchEventHandler {
         return 0;
     }
 
-    private void updateMetrics(Map<Long, Integer> viewDeltas) {
+    private void updateMetrics(Map<Long, Integer> viewDeltas, LocalDate processingDate) {
         productMetricsFacade.updateViewCountBatch(viewDeltas);
         log.info("ProductMetrics 업데이트 완료");
 
-        productMetricsDailyFacade.updateViewDeltaBatch(viewDeltas, LocalDate.now());
-        log.info("ProductMetricsDaily 업데이트 완료");
+        productMetricsDailyFacade.updateViewDeltaBatch(viewDeltas, processingDate);
+        log.info("ProductMetricsDaily 업데이트 완료 - 처리 날짜: {}", processingDate);
     }
 
     private void markEventsAsHandled(Iterable<ProductEvent> events) {

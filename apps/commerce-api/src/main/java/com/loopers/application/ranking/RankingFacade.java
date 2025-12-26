@@ -113,7 +113,7 @@ public class RankingFacade {
                     ProductInfo productInfo = product != null
                             ? ProductInfo.from(product)
                             : null;
-                    return RankingInfo.of(entry, ProductInfo.from(product));
+                    return RankingInfo.of(entry, productInfo);
                 })
                 .collect(Collectors.toList());
     }

@@ -31,4 +31,9 @@ public class EventHandledRepositoryImpl implements EventHandledRepository {
     public List<EventHandled> findByEventId(String eventId) {
         return eventHandledJpaRepository.findByEventId(eventId);
     }
+
+    @Override
+    public List<EventHandled> findAllByEventIdIn(List<String> eventIds) {
+        return eventHandledJpaRepository.findAllByEventIdIn(eventIds);
+    }
 }

@@ -36,7 +36,7 @@ public class ProductMetricsDailyFacade {
      * 일자별 주문 증감 배치 업데이트
      */
     @Transactional(propagation = Propagation.REQUIRED)
-    public void updateOrderDeltaBatch(Map<Long, Integer> orderDeltas, LocalDate metricDate) {
-        productMetricsDailyRepository.upsertOrderDeltas(orderDeltas, metricDate);
+    public void updateOrderMetricsBatch(Map<Long, com.loopers.application.order.OrderMetrics> orderMetrics, LocalDate metricDate) {
+        productMetricsDailyRepository.upsertOrderDeltas(orderMetrics, metricDate);
     }
 }
