@@ -73,4 +73,8 @@ public class ProductService {
         return productRepository.findById(productId)
                 .orElseThrow(() -> new CoreException(ErrorType.NOT_FOUND, "상품을 찾을 수 없습니다"));
     }
+
+    public List<Product> getAllByIdIn(List<Long> productIds) {
+        return productRepository.findAllByIdIn(productIds);
+    }
 }
